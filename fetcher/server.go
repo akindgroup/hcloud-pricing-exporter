@@ -10,11 +10,7 @@ var _ Fetcher = &server{}
 
 // NewServer creates a new fetcher that will collect pricing information on servers.
 func NewServer(pricing *PriceProvider, additionalLabels ...string) Fetcher {
-<<<<<<< HEAD
-	return &loadBalancer{newBase(pricing, "server", []string{"location", "type"}, additionalLabels...)}
-=======
 	return &server{newBase(pricing, "server", []string{"location", "type"}, additionalLabels...)}
->>>>>>> 062bdc6983e4b28ea0c1b6dfbcd838d899d12d2f
 }
 
 type server struct {
