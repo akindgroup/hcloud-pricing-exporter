@@ -1,6 +1,8 @@
 ARG ARCH=""
 FROM golang:alpine
 
+RUN apk add curl
+
 # Create application directory
 RUN mkdir /app
 ADD . /app/
