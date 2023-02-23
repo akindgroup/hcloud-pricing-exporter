@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"sync"
 
@@ -102,7 +103,8 @@ func (provider *PriceProvider) getPricing() *hcloud.Pricing {
 	if provider.pricing == nil {
 		pricing, _, err := provider.Client.Pricing.Get(context.Background())
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			return nil
 		}
 
 		provider.pricing = &pricing

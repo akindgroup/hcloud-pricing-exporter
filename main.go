@@ -19,6 +19,7 @@ import (
 const (
 	defaultPort          = 8080
 	defaultFetchInterval = 1 * time.Minute
+	defaultTimeout       = 5 * time.Second
 )
 
 var (
@@ -42,7 +43,7 @@ func handleFlags() {
 		}
 	}
 	if hcloudAPIToken == "" {
-		panic(fmt.Errorf("no API token for HCloud specified, but required"))
+		panic("no API token for HCloud specified, but required")
 	}
 
 	additionalLabelsFlag = strings.TrimSpace(strings.ReplaceAll(additionalLabelsFlag, " ", ""))
@@ -77,9 +78,25 @@ func main() {
 	registry := prometheus.NewRegistry()
 	fetchers.RegisterCollectors(registry)
 
-	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	router := http.NewServeMux()
+
+	router.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := w.Write([]byte("ok")); err != nil {
+			log.Println(err)
+		}
+	})
+
+	server := &http.Server{
+		Addr:         fmt.Sprintf(":%d", port),
+		Handler:      router,
+		ReadTimeout:  defaultTimeout,
+		IdleTimeout:  defaultTimeout,
+		WriteTimeout: defaultTimeout,
+	}
+
 	log.Printf("Listening on: http://0.0.0.0:%d\n", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
-		panic(err)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatal(err)
 	}
 }

@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/hetznercloud/hcloud-go/hcloud"
 	"github.com/prometheus/client_golang/prometheus"
@@ -96,6 +97,6 @@ func (fetchers Fetchers) Run(client *hcloud.Client) error {
 // MustRun executes all contained fetchers and panics if any of them threw an error.
 func (fetchers Fetchers) MustRun(client *hcloud.Client) {
 	if err := fetchers.Run(client); err != nil {
-		panic(err)
+		log.Println(err)
 	}
 }

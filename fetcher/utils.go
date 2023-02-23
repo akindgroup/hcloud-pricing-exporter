@@ -1,6 +1,7 @@
 package fetcher
 
 import (
+	"log"
 	"strconv"
 	"time"
 
@@ -35,7 +36,7 @@ func pricingPerHour(monthlyPrice float64) float64 {
 func parseToGauge(gauge prometheus.Gauge, value string) {
 	parsed, err := strconv.ParseFloat(value, 32)
 	if err != nil {
-		panic(err)
+		log.Println(err)
 	}
 	gauge.Set(parsed)
 }
