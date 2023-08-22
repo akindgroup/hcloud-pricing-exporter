@@ -17,8 +17,31 @@ type server struct {
 	*baseFetcher
 }
 
+func getServer(client *hcloud.Client) ([]*hcloud.Server, error) {
+	page := 0
+	var result []*hcloud.Server
+	for {
+
+		servers, response, err := client.Server.List(ctx, hcloud.ServerListOpts{
+			ListOpts: hcloud.ListOpts{
+				Page:    page,
+				PerPage: 50,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, servers...)
+		if page == response.Meta.Pagination.LastPage {
+			break
+		}
+		page++
+	}
+	return result, nil
+}
+
 func (server server) Run(client *hcloud.Client) error {
-	servers, _, err := client.Server.List(ctx, hcloud.ServerListOpts{})
+	servers, err := getServer(client)
 	if err != nil {
 		return err
 	}
@@ -33,7 +56,6 @@ func (server server) Run(client *hcloud.Client) error {
 		},
 			parseAdditionalLabels(server.additionalLabels, s.Labels)...,
 		)
-
 		pricing, err := findServerPricing(location, s.ServerType.Pricings)
 		if err != nil {
 			return err
@@ -55,3 +77,4 @@ func findServerPricing(location *hcloud.Location, pricings []hcloud.ServerTypeLo
 
 	return nil, fmt.Errorf("no server pricing found for location %s", location.Name)
 }
+
