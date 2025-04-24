@@ -1,6 +1,9 @@
 package fetcher
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/hetznercloud/hcloud-go/hcloud"
 )
 
@@ -18,13 +21,17 @@ type floatingIP struct {
 func (floatingIP floatingIP) Run(client *hcloud.Client) error {
 	floatingIPs, _, err := client.FloatingIP.List(ctx, hcloud.FloatingIPListOpts{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list floating IPs: %w", err)
 	}
 
 	for _, f := range floatingIPs {
 		location := f.HomeLocation
 
-		monthlyPrice := floatingIP.pricing.FloatingIP(f.Type, location.Name)
+		monthlyPrice, err := floatingIP.pricing.FloatingIP(f.Type, location.Name)
+		if err != nil {
+			log.Printf("Could not get floating IP pricing for %s (%s, %s): %v", f.Name, f.Type, location.Name, err)
+			return fmt.Errorf("could not get floating IP pricing for %s (%s, %s): %w", f.Name, f.Type, location.Name, err)
+		}
 		hourlyPrice := pricingPerHour(monthlyPrice)
 
 		labels := append([]string{

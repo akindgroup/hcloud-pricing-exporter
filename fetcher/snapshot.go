@@ -1,6 +1,9 @@
 package fetcher
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/hetznercloud/hcloud-go/hcloud"
 )
 
@@ -18,12 +21,18 @@ type snapshot struct {
 func (snapshot snapshot) Run(client *hcloud.Client) error {
 	images, _, err := client.Image.List(ctx, hcloud.ImageListOpts{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list images for snapshot pricing: %w", err)
+	}
+
+	snapshotPricePerGB, err := snapshot.pricing.Image()
+	if err != nil {
+		log.Printf("Could not get snapshot/image pricing: %v", err)
+		return fmt.Errorf("could not get snapshot/image pricing: %w", err)
 	}
 
 	for _, i := range images {
 		if i.Type == "snapshot" {
-			monthlyPrice := float64(i.ImageSize) * snapshot.pricing.Image()
+			monthlyPrice := float64(i.ImageSize) * snapshotPricePerGB
 			hourlyPrice := pricingPerHour(monthlyPrice)
 
 			labels := append([]string{

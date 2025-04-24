@@ -1,6 +1,8 @@
 package fetcher
 
 import (
+	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/hetznercloud/hcloud-go/hcloud"
@@ -18,9 +20,14 @@ type serverBackup struct {
 }
 
 func (serverBackup serverBackup) Run(client *hcloud.Client) error {
-	servers, _, err := client.Server.List(ctx, hcloud.ServerListOpts{})
+	servers, err := getServer(client) // Use existing helper
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list servers for backup pricing: %w", err)
+	}
+
+	backupPercentage, err := serverBackup.pricing.ServerBackup() // Get price once
+	if err != nil {
+		return fmt.Errorf("could not get server backup pricing: %w", err)
 	}
 
 	for _, s := range servers {
@@ -35,13 +42,16 @@ func (serverBackup serverBackup) Run(client *hcloud.Client) error {
 		)
 
 		if s.BackupWindow != "" {
-			serverPrice, err := findServerPricing(location, s.ServerType.Pricings)
+			serverPriceInfo, err := findServerPricing(location, s.ServerType.Pricings)
 			if err != nil {
-				return err
+				// Log or return error? Return seems consistent.
+				log.Printf("Could not find server pricing for %s (%s) needed for backup calculation: %v", s.Name, location.Name, err)
+				return fmt.Errorf("could not find server pricing for %s (%s) needed for backup calculation: %w", s.Name, location.Name, err)
 			}
 
-			hourlyPrice := serverBackup.toBackupPrice(serverPrice.Hourly.Gross)
-			monthlyPrice := serverBackup.toBackupPrice(serverPrice.Monthly.Gross)
+			// Use the adjusted helper function
+			hourlyPrice := calculateBackupPrice(serverPriceInfo.Hourly.Gross, backupPercentage)
+			monthlyPrice := calculateBackupPrice(serverPriceInfo.Monthly.Gross, backupPercentage)
 
 			serverBackup.hourly.WithLabelValues(labels...).Set(hourlyPrice)
 			serverBackup.monthly.WithLabelValues(labels...).Set(monthlyPrice)
@@ -54,11 +64,15 @@ func (serverBackup serverBackup) Run(client *hcloud.Client) error {
 	return nil
 }
 
-func (serverBackup serverBackup) toBackupPrice(rawServerPrice string) float64 {
-	serverPrice, err := strconv.ParseFloat(rawServerPrice, 32)
+// calculateBackupPrice calculates the backup price based on server price and backup percentage.
+func calculateBackupPrice(rawServerPrice string, backupPercentage float64) float64 {
+	serverPrice, err := strconv.ParseFloat(rawServerPrice, 64) // Use 64 bit
 	if err != nil {
+		log.Printf("Error parsing server price '%s' for backup calculation: %v", rawServerPrice, err)
 		return 0
 	}
-
-	return serverPrice * (serverBackup.pricing.ServerBackup() / 100)
+	if backupPercentage <= 0 {
+		return 0
+	}
+	return serverPrice * (backupPercentage / 100)
 }

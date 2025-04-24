@@ -1,6 +1,8 @@
 package fetcher
 
 import (
+	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/hetznercloud/hcloud-go/hcloud"
@@ -20,11 +22,17 @@ type volume struct {
 func (volume volume) Run(client *hcloud.Client) error {
 	volumes, _, err := client.Volume.List(ctx, hcloud.VolumeListOpts{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list volumes: %w", err)
+	}
+
+	volumePricePerGB, err := volume.pricing.Volume()
+	if err != nil {
+		log.Printf("Could not get volume pricing: %v", err)
+		return fmt.Errorf("could not get volume pricing: %w", err)
 	}
 
 	for _, v := range volumes {
-		monthlyPrice := float64(v.Size) * volume.pricing.Volume()
+		monthlyPrice := float64(v.Size) * volumePricePerGB
 		hourlyPrice := pricingPerHour(monthlyPrice)
 
 		labels := append([]string{

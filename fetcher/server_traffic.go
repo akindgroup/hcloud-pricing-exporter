@@ -1,6 +1,8 @@
 package fetcher
 
 import (
+	"fmt"
+	"log"
 	"math"
 
 	"github.com/hetznercloud/hcloud-go/hcloud"
@@ -18,9 +20,15 @@ type serverTraffic struct {
 }
 
 func (serverTraffic serverTraffic) Run(client *hcloud.Client) error {
-	servers, _, err := client.Server.List(ctx, hcloud.ServerListOpts{})
+	servers, err := getServer(client) // Use existing helper
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list servers for traffic pricing: %w", err)
+	}
+
+	trafficPricePerTB, err := serverTraffic.pricing.Traffic()
+	if err != nil {
+		log.Printf("Could not get traffic pricing: %v", err)
+		return fmt.Errorf("could not get traffic pricing: %w", err)
 	}
 
 	for _, s := range servers {
@@ -38,10 +46,10 @@ func (serverTraffic serverTraffic) Run(client *hcloud.Client) error {
 		if additionalTraffic < 0 {
 			serverTraffic.hourly.WithLabelValues(labels...).Set(0)
 			serverTraffic.monthly.WithLabelValues(labels...).Set(0)
-			break
+			continue // Use continue instead of break to process other servers
 		}
 
-		monthlyPrice := math.Ceil(float64(additionalTraffic)/sizeTB) * serverTraffic.pricing.Traffic()
+		monthlyPrice := math.Ceil(float64(additionalTraffic)/sizeTB) * trafficPricePerTB
 		hourlyPrice := pricingPerHour(monthlyPrice)
 
 		serverTraffic.hourly.WithLabelValues(labels...).Set(hourlyPrice)

@@ -1,6 +1,9 @@
 package fetcher
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/hetznercloud/hcloud-go/hcloud"
 )
 
@@ -18,15 +21,18 @@ type primaryIP struct {
 func (primaryIP primaryIP) Run(client *hcloud.Client) error {
 	primaryIPs, _, err := client.PrimaryIP.List(ctx, hcloud.PrimaryIPListOpts{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list primary IPs: %w", err) // Wrap error
 	}
 
 	for _, p := range primaryIPs {
 		datacenter := p.Datacenter
 
+		// Get pricing, handle potential error
 		hourlyPrice, monthlyPrice, err := primaryIP.pricing.PrimaryIP(p.Type, datacenter.Location.Name)
 		if err != nil {
-			return err
+			// Log the error and return it to stop this fetcher's run and report the issue.
+			log.Printf("Could not get primary IP pricing for %s (%s, %s): %v", p.Name, p.Type, datacenter.Location.Name, err)
+			return fmt.Errorf("could not get primary IP pricing for %s (%s, %s): %w", p.Name, p.Type, datacenter.Location.Name, err)
 		}
 
 		labels := append([]string{
